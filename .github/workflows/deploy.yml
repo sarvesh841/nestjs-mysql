@@ -26,7 +26,7 @@ jobs:
 
       - name: Authenticate Docker to GCP
         run: |
-          echo "${{ secrets.GCP_KEY }}" | base64 -d > ${{ github.workspace }}/key.json
+          echo "${{ secrets.GCP_KEY }}" > ${{ github.workspace }}/key.json
           gcloud auth activate-service-account --key-file=${{ github.workspace }}/key.json
           gcloud auth configure-docker us-central1-docker.pkg.dev
 
