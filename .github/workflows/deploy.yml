@@ -6,39 +6,41 @@ on:
       - main
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
 
-      - name: Install dependencies
-        run: npm install
+    - name: Install dependencies
+      run: npm install
 
-      - name: Build Docker image
-        run: docker build -t us-central1-docker.pkg.dev/shaped-apogee-455012-d8/nestjs-repo/nestjs-app:latest .
+    - name: Run build
+      run: npm run build
 
-      - name: Authenticate Docker to GCP
-        run: |
-          echo "${{ secrets.GCP_KEY }}" | base64 -d > ${{ github.workspace }}/key.json
-          gcloud auth activate-service-account --key-file=${{ github.workspace }}/key.json
-          gcloud auth configure-docker us-central1-docker.pkg.dev
+    - name: Authenticate with GCP
+      run: |
+        echo "${{ secrets.GCP_KEY }}" | base64 -d > ${{ github.workspace }}/key.json
+        gcloud auth activate-service-account --key-file=${{ github.workspace }}/key.json
+        gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+        gcloud auth configure-docker us-central1-docker.pkg.dev
 
-      - name: Push Docker Image to Artifact Registry
-        run: |
-          docker push us-central1-docker.pkg.dev/shaped-apogee-455012-d8/nestjs-repo/nestjs-app:latest
+    - name: Build Docker image
+      run: docker build -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nestjs-repo/nestjs-app .
 
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy nestjs-app \
-          --image us-central1-docker.pkg.dev/shaped-apogee-455012-d8/nestjs-repo/nestjs-app:latest \
-          --region us-central1 \
-          --platform managed \
+    - name: Push Docker image to GCP Artifact Registry
+      run: docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nestjs-repo/nestjs-app
+
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy nestjs-app \
+          --image=us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nestjs-repo/nestjs-app \
+          --platform=managed \
+          --region=${{ secrets.GCP_REGION }} \
           --allow-unauthenticated
-          --project=shaped-apogee-455012-d8
