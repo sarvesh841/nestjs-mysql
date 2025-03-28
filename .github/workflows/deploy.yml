@@ -1,0 +1,43 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Docker image
+        run: docker build -t us-central1-docker.pkg.dev/shaped-apogee-455012-d8/nestjs-repo/nestjs-app:latest .
+
+      - name: Authenticate Docker to GCP
+        run: |
+          echo "${{ secrets.GCP_KEY }}" > ${{ github.workspace }}/key.json
+          gcloud auth activate-service-account --key-file=${{ github.workspace }}/key.json
+          gcloud auth configure-docker us-central1-docker.pkg.dev
+
+      - name: Push Docker Image to Artifact Registry
+        run: |
+          docker push us-central1-docker.pkg.dev/shaped-apogee-455012-d8/nestjs-repo/nestjs-app:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy nestjs-app \
+          --image us-central1-docker.pkg.dev/shaped-apogee-455012-d8/nestjs-repo/nestjs-app:latest \
+          --region us-central1 \
+          --platform managed \
+          --allow-unauthenticated
