@@ -3,10 +3,10 @@ name: Deploy to GCP
 on:
   push:
     branches:
-      - main
+      - main  # Change this to your deployment branch if different
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,31 +16,33 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '20'
+        node-version: 20
 
     - name: Install dependencies
       run: npm install
 
-    - name: Run build
+    - name: Run tests
+      run: npm run test
+
+    - name: Build project
       run: npm run build
 
-    - name: Authenticate with GCP
-      run: |
-        echo "${{ secrets.GCP_KEY }}" | base64 -d > ${{ github.workspace }}/key.json
-        gcloud auth activate-service-account --key-file=${{ github.workspace }}/key.json
-        gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-        gcloud auth configure-docker us-central1-docker.pkg.dev
+    - name: Authenticate to GCP
+      env:
+        GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+      run: echo "${GCP_SA_KEY}" | base64 -d > /tmp/key.json
 
-    - name: Build Docker image
-      run: docker build -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nestjs-repo/nestjs-app .
-
-    - name: Push Docker image to GCP Artifact Registry
-      run: docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nestjs-repo/nestjs-app
+    - name: Set up gcloud
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        service_account_key: /tmp/key.json
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
 
     - name: Deploy to Cloud Run
       run: |
         gcloud run deploy nestjs-app \
-          --image=us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nestjs-repo/nestjs-app \
+          --image=gcr.io/${{ secrets.GCP_PROJECT_ID }}/nestjs-app:latest \
           --platform=managed \
-          --region=${{ secrets.GCP_REGION }} \
-          --allow-unauthenticated
+          --region=us-central1 \
+          --allow-unauthenticated \
+          --port=3000
