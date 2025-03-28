@@ -41,3 +41,4 @@ jobs:
           --region us-central1 \
           --platform managed \
           --allow-unauthenticated
+          --project=shaped-apogee-455012-d8
